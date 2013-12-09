@@ -20,7 +20,6 @@ var
   opStartDelay: integer = 1500;
 
 const
-  cShowMode: array[boolean] of Integer = (SW_MINIMIZE, SW_HIDE); //server window show mode
   cStrError = '[error]'#10;
   cStrResult = '[result]'#10;
 
@@ -36,7 +35,6 @@ var
   fn, AExeDir, AIniFN: string;
 begin
   _ActionProc:= AActionProc;
-  //_DefaultIni:= Widestring(PWChar(ADefaultIni));
 
   fn:= GetModuleName(HInstance);
   opDllName:= ChangeFileExt(ExtractFileName(fn), '');
@@ -46,22 +44,21 @@ begin
   opDataDir:= SReadIniKey('ini', 'datadir', AExeDir, AIniFN);
   opEnableHints:= SReadIniKey('ini', 'hints', '1', AIniFN) = '1';
   opHideServer:= SReadIniKey('ini', 'server_hide', '0', AIniFN) = '1';
-  //opCloseServer:= SReadIniKey('ini', 'server_close', '0', AIniFN) = '1';
   opPortNum:= StrToInt(SReadIniKey('ini', 'server_port', IntToStr(opPortNum), AIniFN));
 end;
 
 
-function SGetFileProp(
+function GetEditorProps(
   var fn_editor, fn_src: string;
   var caret_line, caret_col: integer;
-  var AMsg: string;
-  ATruncLine: boolean): boolean;
+  var AMsg: string): boolean;
 const
-  cMaxLineSize = 255;
+  cMaxLen = 260;
 var
-  buf: array[0..Pred(cMaxLineSize)] of Widechar;
-  Str: Widestring;
-  NLine, NCol, NOffset, NSize, i: Integer;
+  bufName: array[0..cMaxLen] of WideChar;
+  bufText: Pointer;
+  NLine, NCol, NOffset, NSize, NSizeBuf: Integer;
+  file_text: string;
   F: TextFile;
 begin
   Result:= false;
@@ -70,16 +67,54 @@ begin
   caret_line:= 1;
   caret_col:= 1;
   AMsg:= '';
-  Str:= '';
 
   //get filename
-  FillChar(buf, SizeOf(buf), 0);
-  if _ActionProc(nil, cActionGetOpenedFileName, PWChar(@buf), Pointer(cSynIdCurrentFile), nil, nil)<>cSynOK then Exit;
-  fn_editor:= buf;
+  FillChar(bufName, SizeOf(bufName), 0);
+  if _ActionProc(nil, cActionGetOpenedFileName, PWChar(@bufName), Pointer(cSynIdCurrentFile), nil, nil)<>cSynOK then Exit;
+  fn_editor:= bufName;
   if fn_editor='' then
   begin
     AMsg:= 'Cannot handle unnamed file tab';
     Exit
+  end;
+
+  //get caret pos
+  if _ActionProc(nil, cActionGetCaretPos, Pointer(@NCol), Pointer(@NLine), Pointer(@NOffset), nil)<>cSynOK then
+  begin
+    AMsg:= 'Cannot get caret pos';
+    Exit;
+  end;
+  caret_line:= NLine+1;
+  caret_col:= NCol+1;
+
+  NSize:= 1; //1 char initially
+  NSizeBuf:= (NSize+1)*2;
+  GetMem(bufText, NSizeBuf);
+  try
+    if _ActionProc(nil, cActionGetText, Pointer(cSynIdAllText), bufText, Pointer(@NSize), nil)<>cSynSmallBuffer then
+    begin
+      AMsg:= 'Cannot get text (unexpected GetText result)';
+      Exit;
+    end;
+  finally
+    FreeMem(bufText);
+    bufText:= nil;
+  end;
+
+  NSizeBuf:= (NSize+1)*2;
+  GetMem(bufText, NSizeBuf);
+  try
+    FillChar(bufText^, NSizeBuf, 0);
+    if _ActionProc(nil, cActionGetText, Pointer(cSynIdAllText), bufText, Pointer(@NSize), nil)<>cSynOK then
+    begin
+      AMsg:= 'Cannot get text (small buffer)';
+      Exit;
+    end;
+    file_text:= WideString(PWideChar(bufText));
+    //ShowMessage(file_text);//
+  finally
+    FreeMem(bufText);
+    bufText:= nil;
   end;
 
   fn_src:= ChangeFileExt(fn_editor, '_tempSyn' + ExtractFileExt(fn_editor));
@@ -91,47 +126,7 @@ begin
       AMsg:= 'Cannot create temp file (in source code folder)';
       Exit
     end;
-
-    //get caret pos
-    if _ActionProc(nil, cActionGetCaretPos, Pointer(@NCol), Pointer(@NLine), Pointer(@NOffset), nil)<>cSynOK then
-    begin
-      AMsg:= 'Cannot get caret pos';
-      Exit;
-    end;
-    caret_line:= NLine+1;
-    caret_col:= NCol+1;  
-
-    //get all lines before current line
-    for i:= 0 to NLine-1 do
-    begin
-      NSize:= SizeOf(buf) div 2;
-      if _ActionProc(nil, cActionGetText, Pointer(i), Pointer(@buf), Pointer(@NSize), nil)<>cSynOK then Break;
-      Str:= buf;
-      Writeln(F, Str);
-    end;
-
-    //get current line (truncated by caret pos)
-    NSize:= SizeOf(buf) div 2;
-    if _ActionProc(nil, cActionGetText, Pointer(NLine), Pointer(@buf), Pointer(@NSize), nil)<>cSynOK then
-    begin
-      AMsg:= 'Cannot get editor text';
-      Exit
-    end;  
-    Str:= buf;
-
-    if ATruncLine then
-    begin
-      //cut line after caret
-      Delete(Str, NCol+1, MaxInt);
-
-      //cut last id from line (it confuses CodeIntel)
-      i:= Length(Str);
-      while (i>0) and IsWordChar(Str[i]) do Dec(i);
-      Delete(Str, i+1, MaxInt);
-      caret_col:= i+1;
-    end;  
-
-    Write(F, Str); //not Writeln
+    Write(F, file_text); //not Writeln
     Result:= true;
   finally
     CloseFile(F);
@@ -188,6 +183,23 @@ begin
     Sleep(opStartDelay);
 end;
 
+procedure InitPathIni;
+const
+  bufLen = 4*1024;
+var
+  buf: array[0..bufLen] of WideChar;
+  NSize: Integer;
+  str, fn: string;
+begin
+  FillChar(buf, SizeOf(buf), 0);
+  NSize:= bufLen;
+  if _ActionProc(nil, cActionGetText, Pointer(cSynIdSearchPaths), Pointer(@buf), Pointer(@NSize), nil)=cSynOK then
+  begin
+    str:= buf;
+    fn:= opDataDir + '\path.ini';
+    FWriteString(fn, str);
+  end;
+end;
 
 function SynAction(AHandle: Pointer; AName: PWideChar; A1, A2, A3, A4: Pointer): Integer; stdcall;
 var
@@ -202,6 +214,8 @@ var
 begin
   Result:= cSynError;
   SAction:= PWideChar(AName);
+
+  InitPathIni;
 
   if not IsServerRun then
   begin
@@ -235,7 +249,7 @@ begin
     else
       AActionId:= '';
 
-    if not SGetFileProp(fn_editor, fn_src, num_line, num_col, AErrorMsg, SAction<>cActionFindID) then
+    if not GetEditorProps(fn_editor, fn_src, num_line, num_col, AErrorMsg) then
     begin
       if AErrorMsg<>'' then
         Msg(AErrorMsg)
@@ -243,6 +257,8 @@ begin
         Msg('Cannot get editor properties');
       Exit
     end;
+
+    //Msg(Format('%d:%d', [num_line, num_col]));////
 
     try
       try

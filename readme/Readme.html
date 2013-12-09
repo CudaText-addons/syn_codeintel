@@ -9,7 +9,7 @@
 <li> <a href="#in">Intro</a>
 <li> <a href="#inst">How to install</a>
 <li> <a href="#use">How to use</a>
-<li> <a href="#paths">Search paths</a>
+<li> <a href="#paths">How to specify search paths</a>
 <li> <a href="#ini">Config file</a>
 <li> <a href="#ab">About</a>
 </ul>
@@ -76,9 +76,18 @@ If id declaration can be found by Jedi library, you'll see "Found" message in st
 <a name="paths"></a>
 <h1>How to specify search paths</h1>
 
-<p>You can specify additional search folders, for your custom Python libraries, using
-file "paths.ini" in the SynJedi folder.<br />
-List there folder paths line-by-line. File encoding is Ansi.
+<p>You can specify additional folders, for your custom Python libraries, using one or both of methods:
+<ul>
+	<li> list folders in SynWrite options dialog, "Path Environment" tab;
+	<li> list folders in current SynWrite project's properties dialog (if you have different folders for each project).
+</ul>
+</p>
+
+<p>Notes:
+<ul>
+	<li> If you have changed search folders, server window must be closed, to apply this setting to server.
+	<li> SynWrite feature <i>"append '*' to search folder to search in all subfolders"</i> isn't supported here.
+</ul>
 </p>
 
 <br />
@@ -87,7 +96,7 @@ List there folder paths line-by-line. File encoding is Ansi.
 
 <p>You may create file "SynJedi.ini" in the SynJedi folder and write there few options in section [ini]:</p>
 <ul>
-<li> <b>datadir</b>: Specifies folder where plugin finds its data: folder "python3", folder "jedi", file "server.py".
+<li> <b>datadir</b>: Specifies folder where plugin finds its folder "server".
 <li> <b>hints</b> (bool, 0 or 1): Enables to show function hints. 
 <li> <b>server_port</b>: Specifies TCP port for server process. Default is 11112. 
 <li> <b>server_hide</b> (bool): Enables to hide server window (otherwise window is minimized). 

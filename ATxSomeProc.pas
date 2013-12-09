@@ -2,12 +2,9 @@ unit ATxSomeProc;
 
 interface
 
-type
-  TExecCode = (exOk, exCannotRun, exExcept);
-
-//function FExecProcess(const CmdLine, CurrentDir: Widestring; ShowCmd: integer; DoWait: boolean): TExecCode;
 function FExecCmd(const Cmd, Params, Dir: string; ShowMode: Integer): boolean;
 function FGetFileSize(const FileName: WideString): Int64; overload;
+procedure FWriteString(const fn, str: string);
 
 function IsWordChar(C: Widechar): boolean;
 function SExpandVars(const S: WideString): WideString;
@@ -21,6 +18,7 @@ implementation
 uses
   SysUtils,
   Windows,
+  Classes,
   ShellApi;
 
 function IsWordChar(C: Widechar): boolean;
@@ -39,34 +37,6 @@ begin
   Result := WideString(BufferW);
 end;
 
-
-function FExecProcess(const CmdLine, CurrentDir: Widestring; ShowCmd: integer; DoWait: boolean): TExecCode;
-var
-  pi: TProcessInformation;
-  si: TStartupInfo;
-  code: DWord;
-begin
-  FillChar(pi, SizeOf(pi), 0);
-  FillChar(si, SizeOf(si), 0);
-  si.cb:= SizeOf(si);
-  si.dwFlags:= STARTF_USESHOWWINDOW;
-  si.wShowWindow:= ShowCmd;
-
-  if not CreateProcessW(nil, PWChar(CmdLine), nil, nil, false, 0,
-    nil, PWChar(CurrentDir), si, pi) then
-    Result:= exCannotRun
-  else
-    begin
-    if DoWait then WaitForSingleObject(pi.hProcess, INFINITE);
-    if GetExitCodeProcess(pi.hProcess, code) and
-      (code >= $C0000000) and (code <= $C000010E) then
-      Result:= exExcept
-    else
-      Result:= exOk;
-    CloseHandle(pi.hThread);
-    CloseHandle(pi.hProcess);
-    end;
-end;
 
 function FExecCmd(const Cmd, Params, Dir: string; ShowMode: Integer): boolean;
 var
@@ -150,5 +120,18 @@ begin
   until False;
 end;
 
+
+procedure FWriteString(const fn, str: string);
+var
+  L: TStringList;
+begin
+  L:= TStringList.Create;
+  try
+    L.Add(str);
+    L.SaveToFile(fn);
+  finally
+    FreeAndNil(L)
+  end;
+end;
 
 end.

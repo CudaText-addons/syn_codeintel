@@ -1,6 +1,10 @@
 SynJedi version history
 -----------------------
 
+1.0.4
+* search folders must be specified another way. See readme file about it.
++ faster readin of big files.
+
 1.0.2 (dec 2013)
 - file server.py rearranged
 - files rearranged
