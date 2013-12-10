@@ -2,7 +2,7 @@ unit ATxSomeProc;
 
 interface
 
-function FExecCmd(const Cmd, Params, Dir: string; ShowMode: Integer): boolean;
+function FExecAsAdmin(const Cmd, Params, Dir: string; ShowMode: Integer; AsAdmin: boolean): boolean;
 function FGetFileSize(const FileName: WideString): Int64; overload;
 procedure FWriteString(const fn, str: string);
 
@@ -38,16 +38,19 @@ begin
 end;
 
 
-function FExecCmd(const Cmd, Params, Dir: string; ShowMode: Integer): boolean;
+function FExecAsAdmin(const Cmd, Params, Dir: string; ShowMode: Integer; AsAdmin: boolean): boolean;
 var
   Verb: string;
 begin
-  //Vista? then "runas"
-  {
-  if Win32MajorVersion >= 6 then
-    Verb:= 'runas'
+  if AsAdmin then
+  begin
+    //Vista? then "runas"
+    if Win32MajorVersion >= 6 then
+      Verb:= 'runas'
+    else
+      Verb:= 'open';
+  end
   else
-  }
     Verb:= 'open';
   Result:= ShellExecute(0, PChar(Verb), PChar(Cmd), PChar(Params), PChar(Dir), ShowMode) > 32;
 end;

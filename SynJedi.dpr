@@ -178,7 +178,7 @@ begin
   SReplaceAll(sParams, '{port}', IntToStr(opPortNum));
   //ShowMessage(sCmd+#13+sParams);////
 
-  Result:= FExecCmd(sCmd, sParams, sServerDir, cShowMode[opHideServer]);
+  Result:= FExecAsAdmin(sCmd, sParams, sServerDir, cShowMode[opHideServer], false{AsAdmin});
   if Result then
     Sleep(opStartDelay);
 end;
